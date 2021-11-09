@@ -1,1 +1,1 @@
-export { default as SqlTransaction } from './SqlTransaction'
+export { default as MariaTransaction } from './MariaTransaction'

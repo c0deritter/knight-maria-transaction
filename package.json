@@ -1,7 +1,7 @@
 {
-  "name": "knight-pg-transaction",
-  "version": "1.0.2",
-  "description": "A transaction lib for PostgreSQL",
+  "name": "knight-maria-transaction",
+  "version": "0.0.1",
+  "description": "A transaction lib for MariaDB",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "files": [
@@ -24,16 +24,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/c0deritter/knight-pg-transaction.git"
+    "url": "https://github.com/c0deritter/knight-maria-transaction.git"
   },
   "keywords": [
     ""
   ],
   "author": "Coderitter GmbH",
   "bugs": {
-    "url": "https://github.com/c0deritter/knight-pg-transaction/issues"
+    "url": "https://github.com/c0deritter/knight-maria-transaction/issues"
   },
-  "homepage": "https://github.com/c0deritter/knight-pg-transaction#readme",
+  "homepage": "https://github.com/c0deritter/knight-maria-transaction#readme",
   "dependencies": {
     "@types/mysql": "^2.15.19",
     "knight-log": "^1.0.6",

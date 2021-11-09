@@ -1,25 +1,25 @@
-# Knight PostgreSQL Transaction by Coderitter
+# Knight Maria Transaction by Coderitter
 
-A transaction lib for PostgreSQL.
+A transaction lib for MariaDB.
 
 ## Related packages
 
 There is an SQL package [knight-sql](https://github.com/c0deritter/knight-sql) which helps with building SQL strings. It can be combined with [knight-criteria](https://github.com/c0deritter/knight-criteria) and [knight-sql-criteria-filler](https://github.com/c0deritter/knight-sql-criteria-filler). If you are looking for a more sophisticated version for database access you can also use [knight-orm](https://github.com/c0deritter/knight-orm).
 
-Another helpful PostgreSQL tool is [knight-pg-migration](https://github.com/c0deritter/knight-pg-migration).
+Another helpful MariaDB tool is [knight-maria-migration](https://github.com/c0deritter/knight-maria-migration).
 
 ## Install
 
-`npm install knight-pg-transaction`
+`npm install knight-maria-transaction`
 
 ## Quickstart
 
 ```typescript
-import { PgTransaction } from 'knight-pg-transaction'
-import { Pool } from 'pg'
+import { MariaTransaction } from 'knight-maria-transaction'
+import { Pool } from 'mariadb'
 
 let pool = new Pool({ host: ... })
-let tx = new PgTransaction(pool)
+let tx = new MariaTransaction(pool)
 
 tx.runInTransaction(async () => {
     await tx.query('SELECT * FROM user')
@@ -82,7 +82,7 @@ If you call `commit()` or `rollback()` without having called begin, both methods
 
 ### query()
 
-Resembles the standard PostgreSQL pool query method. If the transaction has gained a connection from the pool it will use it. Otherwise it will call query on the pool directly. That way you can either use the transaction as it was the pool or you can also use it with a explicit connection gained from the pool but without using any transactions.
+Resembles the standard MariaDB pool query method. If the transaction has gained a connection from the pool it will use it. Otherwise it will call query on the pool directly. That way you can either use the transaction as it was the pool or you can also use it with a explicit connection gained from the pool but without using any transactions.
 
 ```typescript
 let result = await tx.query('SELECT * FROM table WHERE column = ?', [1])

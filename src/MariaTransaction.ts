@@ -1,7 +1,7 @@
 import { Log } from 'knight-log'
 import { Pool, PoolConnection } from 'mariadb'
 
-let log = new Log('knight-sql-transaction/SqlTransaction.ts')
+let log = new Log('knight-maria-transaction/SqlTransaction.ts', 'dev')
 
 
 export default class MariaTransaction {
@@ -35,7 +35,7 @@ export default class MariaTransaction {
     return this.client
   }
 
-  release(): void {
+  async release(): Promise<void> {
     let l = log.mt('release')
     l.lib('this.beginCounter', this.beginCounter)
 
@@ -45,7 +45,7 @@ export default class MariaTransaction {
 
     if (this.client && this.beginCounter == 0) {
       l.lib('There is a client and this.beginCounter is 0. Releasing pool...')
-      this.client.release()
+      await this.client.release()
       this.client = undefined
       this.beginCounter = 0
       this.throwingWrongCommitOrRollbackError = false
@@ -94,7 +94,7 @@ export default class MariaTransaction {
     }
 
     if (this.client == undefined) {
-      throw new Error('Postgres pool client is not there anymore')
+      throw new Error('MariaDB pool client is not there anymore')
     }
 
     if (this.beginCounter == 1) {
@@ -132,7 +132,7 @@ export default class MariaTransaction {
     }
 
     if (this.client == undefined) {
-      throw new Error('Postgres pool client is not there anymore')
+      throw new Error('MariaDB pool client is not there anymore')
     }
 
     if (this.beginCounter > 0) {

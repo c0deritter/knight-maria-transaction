@@ -10,7 +10,7 @@ let expect = chai.expect
 
 let poolHolder: { pool: Pool } = {} as any
 
-describe('SqlTransaction', function () {
+describe('MariaTransaction', function () {
   beforeEach(async function () {
     poolHolder.pool = mariadb.createPool(<PoolConfig>{
       host: 'db',
@@ -18,8 +18,12 @@ describe('SqlTransaction', function () {
       user: 'transaction_test',
       password: 'transaction_test'
     })
-
-    await poolHolder.pool.query('CREATE TABLE IF NOT EXISTS a ( b INTEGER )')
+    let openConnections
+    openConnections = poolHolder.pool.activeConnections()
+    let conn = await poolHolder.pool.getConnection()
+    await conn.query('CREATE TABLE IF NOT EXISTS a ( b INTEGER )')
+    await conn.end()
+    openConnections = poolHolder.pool.activeConnections()
   })
 
   afterEach(async function () {
@@ -34,7 +38,7 @@ describe('SqlTransaction', function () {
       await tx.connect()
 
       expect(tx.client).to.be.not.undefined
-      //expect(poolHolder.pool.idleCount).to.equal(0)
+      expect(poolHolder.pool.activeConnections()).to.equal(1)
     })
 
     it('should not connect a second time', async function () {
@@ -44,7 +48,7 @@ describe('SqlTransaction', function () {
       await tx.connect()
 
       expect(tx.client).to.be.not.undefined
-      //expect(poolHolder.pool.idleCount).to.equal(0)
+      expect(poolHolder.pool.activeConnections()).to.equal(1)
     })
   })
 
@@ -54,20 +58,19 @@ describe('SqlTransaction', function () {
 
       await tx.connect()
       expect(tx.client).to.be.not.undefined
-      //expect(poolHolder.pool.idleCount).to.equal(0)
+      expect(poolHolder.pool.activeConnections()).to.equal(1)
 
-      tx.release()
+      await tx.release()
       expect(tx.client).to.be.undefined
-      //expect(poolHolder.pool.idleCount).to.equal(1)
+      expect(poolHolder.pool.activeConnections()).to.equal(0)
     })
 
-    it('should not release when inside a transaction', async function () {
+    it.only('should not release when inside a transaction', async function () {
       let tx = new MariaTransaction(poolHolder.pool)
 
       await tx.connect()
       await tx.begin()
-
-      expect(function () { tx.release() }).to.throw('Transaction is running. Cannot release.')
+      expect(tx.release()).to.be.rejectedWith('Transaction is running. Cannot release.');
     })
   })
 
