@@ -1,0 +1,222 @@
+import { Log } from 'knight-log'
+import { Pool, PoolConnection } from 'mariadb'
+
+let log = new Log('knight-sql-transaction/SqlTransaction.ts')
+
+
+export default class MariaTransaction {
+
+  pool: Pool
+  client?: PoolConnection
+  beginCounter: number = 0
+  throwingWrongCommitOrRollbackError = false
+  afterBeginFunctions: (() => any)[] = []
+  afterCommitFunctions: (() => any)[] = []
+
+  constructor(pool: Pool) {
+    this.pool = pool
+  }
+
+  async connect(): Promise<PoolConnection> {
+    let l = log.mt('connect')
+
+    if (!this.client) {
+      l.lib('No client found. Connecting pool...')
+      let conn;
+      try {
+        conn = await this.pool.getConnection();
+        this.client = conn
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    l.lib('Returning client...')
+    return this.client
+  }
+
+  release(): void {
+    let l = log.mt('release')
+    l.lib('this.beginCounter', this.beginCounter)
+
+    if (this.beginCounter > 0) {
+      throw new Error('Transaction is running. Cannot release.')
+    }
+
+    if (this.client && this.beginCounter == 0) {
+      l.lib('There is a client and this.beginCounter is 0. Releasing pool...')
+      this.client.release()
+      this.client = undefined
+      this.beginCounter = 0
+      this.throwingWrongCommitOrRollbackError = false
+    }
+    else {
+      l.lib('this.client is undefined or this.beginCounter is greater than 0. Doing nothing...')
+    }
+
+    l.lib('Returning...')
+  }
+
+  async begin(): Promise<void> {
+    let l = log.mt('begin')
+
+    if (!this.client) {
+      l.lib('No client found. Connecting...')
+      await this.connect()
+    }
+
+    if (this.beginCounter == 0) {
+      l.lib('this.beginCounter is 0. Beginning new transaction...')
+      await this.client!.query('BEGIN')
+      this.beginCounter++
+
+      l.lib('Executing this.afterBeginFunctions...')
+      for (let fn of this.afterBeginFunctions) {
+        await fn()
+      }
+    }
+    else {
+      l.lib('this.beginCounter is greater than 0. Increasing this.beginCounter...' + this.beginCounter + ' -> ' + (this.beginCounter + 1))
+      this.beginCounter++
+    }
+
+    l.lib('Returning...')
+  }
+
+  async commit(): Promise<void> {
+    let l = log.mt('commit')
+    l.lib('this.beginCounter', this.beginCounter)
+
+    if (this.beginCounter <= 0) {
+      l.lib('this.beginCounter is 0. Cannot commit. Setting this.throwingWrongCommitOrRollbackError to true...')
+      this.throwingWrongCommitOrRollbackError = true
+      throw new Error('Transaction not running. Cannot commit.')
+    }
+
+    if (this.client == undefined) {
+      throw new Error('Postgres pool client is not there anymore')
+    }
+
+    if (this.beginCounter == 1) {
+      l.lib('this.beginCounter is 1. Committing transaction...')
+
+      await this.client.query('COMMIT')
+      this.client.release()
+      this.client = undefined
+      this.beginCounter = 0
+      this.throwingWrongCommitOrRollbackError = false
+
+      l.lib('Executing this.afterCommitFunctions...')
+      for (let fn of this.afterCommitFunctions) {
+        await fn()
+      }
+
+      this.afterCommitFunctions = []
+    }
+    else {
+      l.lib('this.beginCounter is greater than 1. Decrementing this.beginCounter... ' + this.beginCounter + ' -> ' + (this.beginCounter - 1))
+      this.beginCounter--
+    }
+
+    l.lib('Returning...')
+  }
+
+  async rollback(): Promise<void> {
+    let l = log.mt('rollback')
+    l.lib('this.beginCounter', this.beginCounter)
+
+    if (this.beginCounter <= 0) {
+      l.lib('this.beginCounter is 0. Cannot rollback. Setting this.throwingWrongCommitOrRollbackError to true...')
+      this.throwingWrongCommitOrRollbackError = true
+      throw new Error('Transaction not running. Cannot rollback.')
+    }
+
+    if (this.client == undefined) {
+      throw new Error('Postgres pool client is not there anymore')
+    }
+
+    if (this.beginCounter > 0) {
+      l.lib('this.beginCounter is greater than 0. Rolling back...')
+      await this.client.query('ROLLBACK')
+      this.client.release()
+      this.client = undefined
+      this.beginCounter = 0
+      this.throwingWrongCommitOrRollbackError = false
+    }
+
+    l.lib('Returning...')
+  }
+
+  async runInTransaction<T>(code: () => Promise<T>): Promise<T> {
+    let l = log.mt('runInTransaction')
+
+    try {
+      let beginCounterBefore = this.beginCounter
+      l.lib('beginCounterBefore', beginCounterBefore)
+
+      await this.begin()
+
+      l.lib('Executing given code...')
+      let result = await code()
+
+      // Check if the user did not call commit and do it for her if needed.
+      // In fact, commit as often needed until the beginCounter has the same value as before.
+      // Because the user might have called begin multiple times without any call to commit at all.
+
+      l.lib('Call commit until the this.beginCounter has the value from before... ' + this.beginCounter + ' -> ' + beginCounterBefore)
+
+      while (this.beginCounter > beginCounterBefore) {
+        await this.commit()
+      }
+
+      l.lib('Done calling commit. Returning result...')
+
+      return result
+    }
+    catch (e) {
+      l.error('Caught an error', e)
+      l.lib('this.beginCounter', this.beginCounter)
+
+      if (this.beginCounter > 0) {
+        if (!this.throwingWrongCommitOrRollbackError) {
+          l.lib('this.beginCounter is greater than 0 and not throwing from wrong commit nor from wrong rollback. Rolling back...')
+
+          try {
+            await this.rollback()
+          }
+          catch (e) {
+            l.lib('Could not roll back. Releasing pool...')
+            this.release()
+            throw new Error(<any>e)
+          }
+        }
+
+        l.lib('Releasing pool...')
+        this.release()
+      }
+
+      l.lib('Rethrowing error...')
+      throw e
+    }
+  }
+
+  afterBegin(fn: () => any): void {
+    this.afterBeginFunctions.push(fn)
+  }
+
+  afterCommit(fn: () => any): void {
+    this.afterCommitFunctions.push(fn)
+  }
+
+  async query(arg1: any, arg2?: any): Promise<any> {
+    if (this.beginCounter == 0) {
+      try {
+        return (this.pool.query(arg1, arg2))
+
+      } catch (err) {
+        throw err;
+      }
+    }
+    return this.client!.query(arg1, arg2)
+  }
+}
