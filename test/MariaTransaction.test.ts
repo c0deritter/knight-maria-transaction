@@ -65,7 +65,7 @@ describe('MariaTransaction', function () {
       expect(poolHolder.pool.activeConnections()).to.equal(0)
     })
 
-    it.only('should not release when inside a transaction', async function () {
+    it('should not release when inside a transaction', async function () {
       let tx = new MariaTransaction(poolHolder.pool)
 
       await tx.connect()
