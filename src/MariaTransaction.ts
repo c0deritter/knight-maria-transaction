@@ -1,7 +1,7 @@
 import { Log } from 'knight-log'
 import { Pool, PoolConnection } from 'mariadb'
 
-let log = new Log('knight-maria-transaction/SqlTransaction.ts', 'dev')
+let log = new Log('knight-maria-transaction/SqlTransaction.ts')
 
 
 export default class MariaTransaction {
