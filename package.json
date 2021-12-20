@@ -1,6 +1,6 @@
 {
   "name": "knight-maria-transaction",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A transaction lib for MariaDB",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
